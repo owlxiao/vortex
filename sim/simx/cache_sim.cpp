@@ -156,6 +156,7 @@ struct bank_req_t {
 	uint64_t uuid;
 	ReqType  type;
 	bool     write;
+	bool     prefetch;
 
 	bank_req_t(uint32_t num_ports)
 		: ports(num_ports)
@@ -494,6 +495,7 @@ public:
 				bank_req.uuid  = core_req.uuid;
 				bank_req.type  = bank_req_t::Core;
 				bank_req.write = core_req.write;
+				bank_req.prefetch = core_req.prefetch;
 				pipeline_req   = bank_req;
 				DT(3, simobject_->name() << "-core-req: " << core_req);
 			}
@@ -562,7 +564,7 @@ private:
 			} break;
 			case bank_req_t::Replay: {
 				// send core response
-				if (!pipeline_req.write || config_.write_reponse) {
+				if (!pipeline_req.prefetch && (!pipeline_req.write || config_.write_reponse)) {
 					for (auto& info : pipeline_req.ports) {
 						if (!info.valid)
 							continue;
@@ -619,7 +621,7 @@ private:
 						}
 					}
 					// send core response
-					if (!pipeline_req.write || config_.write_reponse) {
+					if (!pipeline_req.prefetch && (!pipeline_req.write || config_.write_reponse)) {
 						for (auto& info : pipeline_req.ports) {
 							if (!info.valid)
 								continue;
@@ -642,6 +644,7 @@ private:
 							MemReq mem_req;
 							mem_req.addr  = params_.mem_addr(bank_id, pipeline_req.set_id, repl_line.tag);
 							mem_req.write = true;
+							mem_req.prefetch = false;
 							mem_req.cid   = pipeline_req.cid;
 							mem_req_ports_.at(bank_id).push(mem_req, 1);
 							DT(3, simobject_->name() << "-bank" << bank_id << "-writeback: " << mem_req);
@@ -655,6 +658,7 @@ private:
 							MemReq mem_req;
 							mem_req.addr  = params_.mem_addr(bank_id, pipeline_req.set_id, pipeline_req.tag);
 							mem_req.write = true;
+							mem_req.prefetch = false;
 							mem_req.cid   = pipeline_req.cid;
 							mem_req.uuid  = pipeline_req.uuid;
 							mem_req_ports_.at(bank_id).push(mem_req, 1);
@@ -683,6 +687,7 @@ private:
 							MemReq mem_req;
 							mem_req.addr  = params_.mem_addr(bank_id, pipeline_req.set_id, pipeline_req.tag);
 							mem_req.write = false;
+							mem_req.prefetch = pipeline_req.prefetch;
 							mem_req.tag   = mshr_id;
 							mem_req.cid   = pipeline_req.cid;
 							mem_req.uuid  = pipeline_req.uuid;

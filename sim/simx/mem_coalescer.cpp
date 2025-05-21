@@ -129,7 +129,7 @@ void MemCoalescer::tick() {
   assert(!out_mask.none());
 
   uint32_t tag = 0;
-  if (!in_req.write) {
+  if (!in_req.write && !in_req.prefetch) {
     // allocate a response tag for read requests
     tag = pending_rd_reqs_.allocate(pending_req_t{in_req.tag, cur_mask});
   }
@@ -139,6 +139,7 @@ void MemCoalescer::tick() {
   out_req.mask = out_mask;
   out_req.tag = tag;
   out_req.write = in_req.write;
+  out_req.prefetch = in_req.prefetch;
   out_req.addrs = out_addrs;
   out_req.cid = in_req.cid;
   out_req.uuid = in_req.uuid;

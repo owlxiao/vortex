@@ -166,10 +166,11 @@ void LsuUnit::tick() {
 			continue;
 		}
 
+		bool is_prefetch = trace->lsu_type == LsuType::PREFETCH;
 		bool is_write = ((trace->lsu_type == LsuType::STORE) || (trace->lsu_type == LsuType::TCU_STORE));
 
 		// check pending queue capacity
-		if (!is_write && state.pending_rd_reqs.full()) {
+		if (!is_write && !is_prefetch && state.pending_rd_reqs.full()) {
 			if (!trace->log_once(true)) {
 				DT(4, "*** " << this->name() << "-queue-full: " << *trace);
 			}
@@ -181,6 +182,7 @@ void LsuUnit::tick() {
 		// build memory request
 		LsuReq lsu_req(NUM_LSU_LANES);
 		lsu_req.write = is_write;
+		lsu_req.prefetch = is_prefetch;
 		{
 			auto trace_data = std::dynamic_pointer_cast<LsuTraceData>(trace->data);
 			auto t0 = trace->pid * NUM_LSU_LANES;
@@ -193,7 +195,7 @@ void LsuUnit::tick() {
 		}
 		uint32_t tag = 0;
 
-		if (!is_write) {
+		if (!is_write && !is_prefetch) {
 			tag = state.pending_rd_reqs.allocate({trace, lsu_req.mask});
 		}
 		lsu_req.tag  = tag;
@@ -213,8 +215,8 @@ void LsuUnit::tick() {
 			pending_loads_ += num_addrs;
 		}
 
-		// do not wait on writes
-		if (is_write) {
+		// do not wait on writes and prefetches
+		if (is_write || is_prefetch) {
 			Outputs.at(iw).push(trace, 1);
 		}
 

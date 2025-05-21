@@ -52,6 +52,7 @@ void LocalMemSwitch::tick() {
 
     LsuReq out_dc_req(in_req.mask.size());
     out_dc_req.write = in_req.write;
+    out_dc_req.prefetch = in_req.prefetch;
     out_dc_req.tag   = in_req.tag;
     out_dc_req.cid   = in_req.cid;
     out_dc_req.uuid  = in_req.uuid;
@@ -146,6 +147,7 @@ void LsuMemAdapter::tick() {
         // build memory request
         MemReq out_req;
         out_req.write = in_req.write;
+        out_req.prefetch = in_req.prefetch;
         out_req.addr  = in_req.addrs.at(i);
         out_req.type  = get_addr_type(in_req.addrs.at(i));
         out_req.tag   = in_req.tag;

@@ -239,6 +239,11 @@ inline void vx_matrix_mul()
     __asm__ volatile (".insn i 0x7b, 2, x0, 0(x0)");
 }
 
+// Prefetch Instruction 
+inline void vx_prefetch(uint32_t addr) {
+    __asm__ volatile (".insn r %0, 0, 1, x0, %1, x0" :: "i"(RISCV_CUSTOM0), "r"(addr));
+}
+
 #ifdef __cplusplus
 }
 #endif

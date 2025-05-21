@@ -1430,6 +1430,24 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         std::abort();
       }
     } break;
+    case 1: {
+      if (func3 == 0) {
+        // Prefetch 
+        trace->fu_type = FUType::LSU;
+        trace->lsu_type = LsuType::PREFETCH;
+
+        auto trace_data = std::make_shared<LsuTraceData>(num_threads);
+        trace->data = trace_data;
+
+        for (uint32_t t = 0; t < num_threads; ++t) {
+          if (!warp.tmask.test(t))
+            continue;
+
+          uint32_t base_addr = rsdata[t][0].i ;
+          trace_data->mem_addrs.at(t) = {base_addr, 0};
+        }
+      }
+    } break;
     default:
       std::abort();
     }
