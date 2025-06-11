@@ -258,7 +258,7 @@ float *forward(Transformer *transformer, int token, int pos) {
   memcpy(x, content_row, dim * sizeof(*x));
 
   // forward all the layers
-  for (unsigned long long l = 0; l < p->n_layers; l++) {
+  for (unsigned long long l = 0; l < (unsigned long long)p->n_layers; l++) {
 
     // attention rmsnorm
     rmsnorm(s->xb, x, w->rms_att_weight + l * dim, dim);
@@ -377,7 +377,7 @@ float *forward(Transformer *transformer, int token, int pos) {
 // The Byte Pair Encoding (BPE) Tokenizer that translates strings <-> tokens
 
 typedef struct {
-  char *str;
+  const char *str;
   int id;
 } TokenIndex;
 
@@ -394,7 +394,7 @@ int compare_tokens(const void *a, const void *b) {
   return strcmp(((TokenIndex *)a)->str, ((TokenIndex *)b)->str);
 }
 
-void build_tokenizer(Tokenizer *t, char *tokenizer_path, int vocab_size) {
+void build_tokenizer(Tokenizer *t, const char *tokenizer_path, int vocab_size) {
   // i should have written the vocab_size into the tokenizer file... sigh
   t->vocab_size = vocab_size;
   // malloc space to hold the scores and the strings
@@ -477,9 +477,9 @@ void safe_printf(char *piece) {
   printf("%s", piece);
 }
 
-int str_lookup(char *str, TokenIndex *sorted_vocab, int vocab_size) {
+int str_lookup(const char *str, TokenIndex *sorted_vocab, int vocab_size) {
   // efficiently find the perfect match for str in vocab, return its index or -1 if not found
-  TokenIndex tok = {.str = str}; // acts as the key to search for
+  TokenIndex tok = {.str = str, .id = 0}; // acts as the key to search for
   TokenIndex *res = (TokenIndex *)bsearch(&tok, sorted_vocab, vocab_size, sizeof(TokenIndex), compare_tokens);
   return res != NULL ? res->id : -1;
 }
@@ -565,7 +565,7 @@ void encode(Tokenizer *t, char *text, int8_t bos, int8_t eos, int *tokens, int *
       // byte_fallback encoding: just encode each byte as a token
       // +3 is here because the first 3 vocab elements are <unk>, <s>, </s>
       // so the individual bytes only start at index 3
-      for (int i = 0; i < str_len; i++) {
+      for (int i = 0; i < (int)str_len; i++) {
         tokens[(*n_tokens)++] = (unsigned char)str_buffer[i] + 3;
       }
     }
@@ -771,7 +771,7 @@ long time_in_ms() {
 // generation loop
 
 void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, char *prompt, int steps) {
-  char *empty_prompt = "";
+  char empty_prompt[] = "";
   if (prompt == NULL) {
     prompt = empty_prompt;
   }
@@ -863,10 +863,9 @@ void chat(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler,
 
   // start the main loop
   int8_t user_turn = 1; // user starts
-  int next;             // will store the next token in the sequence
+  int next = 0;         // will store the next token in the sequence
   int token;            // stores the current token to feed into the transformer
-  int prev_token;
-  int pos = 0; // position in the sequence
+  int pos = 0;          // position in the sequence
   while (pos < steps) {
 
     // when it is the user's turn to contribute tokens to the dialog...
@@ -960,13 +959,13 @@ int main(int argc, char *argv[]) {
 
   // default parameters
   char *checkpoint_path = NULL; // e.g. out/model.bin
-  char *tokenizer_path = "tokenizer.bin";
+  const char *tokenizer_path = "tokenizer.bin";
   float temperature = 1.0f;        // 0.0 = greedy deterministic. 1.0 = original. don't set higher
   float topp = 0.9f;               // top-p in nucleus sampling. 1.0 = off. 0.9 works well, but slower
   int steps = 256;                 // number of steps to run for
   char *prompt = NULL;             // prompt string
   unsigned long long rng_seed = 0; // seed rng with time by default
-  char *mode = "generate";         // generate|chat
+  const char *mode = "generate";         // generate|chat
   char *system_prompt = NULL;      // the (optional) system prompt to use in chat mode
 
   // poor man's C argparse so we can override the defaults above from the command line
