@@ -7,7 +7,7 @@ SRC_DIR := $(VORTEX_HOME)/tests/regression/$(PROJECT)
 
 SRCS := $(SRC_DIR)/main.cpp
 
-VX_SRCS := $(SRC_DIR)/kernel.cpp
+VX_SRCS := $(SRC_DIR)/rmsnorm.cpp
 
 OPTS ?= 
 
