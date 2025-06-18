@@ -31,17 +31,16 @@
 
 using vx_addr_h = uint64_t;
 
-static const char *rmsnorm_kernel = "kernel.vxbin";
-static vx_buffer_h rmsnorm_buffer = nullptr;
-static vx_buffer_h rmsnorm_args_buffer = nullptr;
-static rmsnorm_arg_t rmsnorm_arg = {};
+static const char *matmul_kernel = "kernel.vxbin";
+static vx_buffer_h matmul_buffer = nullptr;
+static vx_buffer_h matmul_args_buffer = nullptr;
 
 static vx_device_h device = nullptr;
 
 static void cleanup() {
   if (device) {
-    vx_mem_free(rmsnorm_buffer);
-    vx_mem_free(rmsnorm_args_buffer);
+    vx_mem_free(matmul_buffer);
+    vx_mem_free(matmul_args_buffer);
     vx_dev_close(device);
   }
 }
@@ -63,7 +62,6 @@ typedef struct {
   // token embedding table
   float *token_embedding_table; // (vocab_size, dim)
   // weights for rmsnorms
-  vx_addr_h rms_att_weight_vx; // (layer, dim) rmsnorm weights
   float *rms_att_weight; // (layer, dim) rmsnorm weights
   float *rms_ffn_weight; // (layer, dim)
   // weights for matmuls. note dim == n_heads * head_size
@@ -71,6 +69,8 @@ typedef struct {
   float *wk; // (layer, dim, n_kv_heads * head_size)
   float *wv; // (layer, dim, n_kv_heads * head_size)
   float *wo; // (layer, n_heads * head_size, dim)
+  vx_addr_h wq_vx;
+
   // weights for ffn
   float *w1; // (layer, hidden_dim, dim)
   float *w2; // (layer, dim, hidden_dim)
@@ -90,6 +90,7 @@ typedef struct {
   float *hb;     // buffer for hidden dimension in the ffn (hidden_dim,)
   float *hb2;    // buffer for hidden dimension in the ffn (hidden_dim,)
   float *q;      // query (dim,)
+  float *q_vx;   // query for Vortex
   float *k;      // key (dim,)
   float *v;      // value (dim,)
   float *att;    // buffer for scores/attention values (n_heads, seq_len)
@@ -114,11 +115,11 @@ void malloc_run_state(RunState *s, Config *p) {
   int kv_dim = (p->dim * p->n_kv_heads) / p->n_heads;
   s->x = (float *)calloc(p->dim, sizeof(float));
   s->xb = (float *)calloc(p->dim, sizeof(float));
-  s->xb_vx = (float *)calloc(p->dim, sizeof(float));
   s->xb2 = (float *)calloc(p->dim, sizeof(float));
   s->hb = (float *)calloc(p->hidden_dim, sizeof(float));
   s->hb2 = (float *)calloc(p->hidden_dim, sizeof(float));
   s->q = (float *)calloc(p->dim, sizeof(float));
+  s->q_vx = (float *)calloc(p->dim, sizeof(float));
   s->key_cache = (float *)calloc(p->n_layers * p->seq_len * kv_dim, sizeof(float));
   s->value_cache = (float *)calloc(p->n_layers * p->seq_len * kv_dim, sizeof(float));
   s->att = (float *)calloc(p->n_heads * p->seq_len, sizeof(float));
@@ -137,6 +138,7 @@ void free_run_state(RunState *s) {
   free(s->hb);
   free(s->hb2);
   free(s->q);
+  free(s->q_vx);
   free(s->att);
   free(s->logits);
   free(s->key_cache);
@@ -176,8 +178,14 @@ void memory_map_weights(TransformerWeights *w, Config *p, float *ptr, int shared
 
 void memory_map_weights_vx(TransformerWeights *w, Config *p, vx_addr_h ptr, int shared_weights) {
   (void)shared_weights;
+  size_t n_layers = p->n_layers;
+
+  // weights for rmsnorms
   ptr += p->vocab_size * p->dim * sizeof(float);
-  w->rms_att_weight_vx = ptr;
+
+  // weights for matmuls. note dim == n_heads * head_size
+  ptr += n_layers * p->dim * sizeof(float); 
+  w->wq_vx = ptr;
 }
 
 void read_checkpoint(char *checkpoint, Config *config, TransformerWeights *weights,
@@ -258,35 +266,6 @@ void rmsnorm(float *o, float *x, float *weight, int size) {
   }
 }
 
-void rmsnorm_vx(float *o, float *x, vx_addr_h weight_vx, int size) {
-  vx_buffer_h o_buffer = nullptr;
-  vx_buffer_h x_buffer = nullptr;
-
-  // Allocate the buffers for the output and input
-  RT_CHECK(vx_mem_alloc(device, size * sizeof(float), VX_MEM_WRITE, &o_buffer));
-  RT_CHECK(vx_mem_address(o_buffer, &rmsnorm_arg.o_addr));
-  RT_CHECK(vx_mem_alloc(device, size * sizeof(float), VX_MEM_READ, &x_buffer));
-  RT_CHECK(vx_mem_address(x_buffer, &rmsnorm_arg.x_addr));
-
-  // Upload the input and output data to the device
-  RT_CHECK(vx_copy_to_dev(x_buffer, x, 0, size * sizeof(float)));
-
-  // Upload the arguments to the device
-  rmsnorm_arg.size = size;
-  rmsnorm_arg.weight_addr = weight_vx;
-  RT_CHECK(vx_upload_bytes(device, &rmsnorm_arg, sizeof(rmsnorm_arg_t), &rmsnorm_args_buffer));
-
-  // Start device
-  RT_CHECK(vx_start(device, rmsnorm_buffer, rmsnorm_args_buffer));
-  RT_CHECK(vx_ready_wait(device, VX_MAX_TIMEOUT));
-
-  // Download the output data from the device
-  RT_CHECK(vx_copy_from_dev(o, o_buffer, 0, size * sizeof(float)));
-
-  // Free the buffers
-  RT_CHECK(vx_mem_free(o_buffer));
-  RT_CHECK(vx_mem_free(x_buffer));
-}
 
 void softmax(float *x, int size) {
   // find max value (for numerical stability)
@@ -322,6 +301,36 @@ void matmul(float *xout, float *x, float *w, int n, int d) {
   }
 }
 
+void matmul_vx(float *xout, float *x, vx_addr_h w, int n, int d) {
+  vx_buffer_h xout_buffer = nullptr;
+  vx_buffer_h x_buffer = nullptr;
+  matmul_arg_t args = {};
+
+  // allocate buffers 
+  // xout (d,) size: d * sizeof(float)
+  RT_CHECK(vx_mem_alloc(device, d * sizeof(float), VX_MEM_WRITE, &xout_buffer));
+  RT_CHECK(vx_mem_address(xout_buffer, &args.xout_addr));
+  // x (n,)    size: n * sizeof(float)
+  RT_CHECK(vx_mem_alloc(device, n * sizeof(float), VX_MEM_READ, &x_buffer));
+  RT_CHECK(vx_mem_address(x_buffer, &args.x_addr));
+
+  RT_CHECK(vx_copy_to_dev(x_buffer, x, 0, n * sizeof(float)));
+
+  args.d = d;
+  args.n = n;
+  args.w_addr = w;
+  RT_CHECK(vx_upload_bytes(device, &args, sizeof(matmul_arg_t), &matmul_args_buffer));
+
+  RT_CHECK(vx_start(device, matmul_buffer, matmul_args_buffer));
+  RT_CHECK(vx_ready_wait(device, VX_MAX_TIMEOUT));
+
+  RT_CHECK(vx_copy_from_dev(xout, xout_buffer, 0, d * sizeof(float)));
+
+  // Free the buffers
+  RT_CHECK(vx_mem_free(xout_buffer));
+  RT_CHECK(vx_mem_free(x_buffer));
+}
+
 bool float_equal(float a, float b, float epsilon) {
   return fabs(a - b) < epsilon;
 }
@@ -347,17 +356,7 @@ float *forward(Transformer *transformer, int token, int pos) {
   for (unsigned long long l = 0; l < (unsigned long long)p->n_layers; l++) {
 
     // attention rmsnorm
-    // rmsnorm(s->xb, x, w->rms_att_weight + l * dim, dim);
-    rmsnorm_vx(s->xb, x, w->rms_att_weight_vx + l * dim * sizeof(float), dim);
-
-    // Check different rmsnorm implementations
-    // for (int i = 0; i < dim; i++) {
-    //   if (!float_equal(s->xb[i], s->xb_vx[i], 0.0001)) {
-    //     fprintf(stderr, "\nRMSNorm mismatch at layer %llu, index %d: %.10f vs %.10f\n",
-    //             l, i, s->xb[i], s->xb_vx[i]);
-    //     exit(EXIT_FAILURE);
-    //   }
-    // }
+    rmsnorm(s->xb, x, w->rms_att_weight + l * dim, dim);
 
     // key and value point to the kv cache
     int loff = l * p->seq_len * kv_dim; // kv cache layer offset for convenience
@@ -365,7 +364,18 @@ float *forward(Transformer *transformer, int token, int pos) {
     s->v = s->value_cache + loff + pos * kv_dim;
 
     // qkv matmuls for this position
-    matmul(s->q, s->xb, w->wq + l * dim * dim, dim, dim);
+    // matmul(s->q, s->xb, w->wq + l * dim * dim, dim, dim);
+    matmul_vx(s->q, s->xb, w->wq_vx + l * dim * dim * sizeof(float), dim, dim);
+
+    // Check different rmsnorm implementations
+    // for (int i = 0; i < dim; i++) {
+    //   if (!float_equal(s->q[i], s->q_vx[i], 0.0001)) {
+    //     fprintf(stderr, "\nMatmul mismatch at layer %llu, index %d: %.10f vs %.10f\n",
+    //             l, i, s->q[i], s->q_vx[i]);
+    //     exit(EXIT_FAILURE);
+    //   }
+    // }
+
     matmul(s->k, s->xb, w->wk + l * dim * kv_dim, dim, kv_dim);
     matmul(s->v, s->xb, w->wv + l * dim * kv_dim, dim, kv_dim);
 
@@ -1117,7 +1127,7 @@ int main(int argc, char *argv[]) {
   RT_CHECK(vx_dev_open(&device));
 
   // Upload kernels
-  RT_CHECK(vx_upload_kernel_file(device, rmsnorm_kernel, &rmsnorm_buffer));
+  RT_CHECK(vx_upload_kernel_file(device, matmul_kernel, &matmul_buffer));
 
   // build the Transformer via the model .bin file
   Transformer transformer;

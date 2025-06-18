@@ -4,10 +4,11 @@
 #include <cstdint>
 
 typedef struct {
-  uint64_t o_addr;
+  uint64_t xout_addr;
   uint64_t x_addr;
-  uint64_t weight_addr;
-  uint64_t size;
-} rmsnorm_arg_t;
+  uint64_t w_addr;
+  uint32_t n;
+  uint32_t d;
+} matmul_arg_t;
 
 #endif // __KERNELS_H__
