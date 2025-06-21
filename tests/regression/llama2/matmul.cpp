@@ -2,27 +2,26 @@
 
 #include <vx_intrinsics.h>
 #include <vx_print.h>
+#include <vx_spawn.h>
 
 void kernel(matmul_arg_t *arg) {
-  auto xout = reinterpret_cast<float *>(arg->xout_addr);
   auto x = reinterpret_cast<float *>(arg->x_addr);
   auto w = reinterpret_cast<float *>(arg->w_addr);
-  auto n = arg->n;
-  auto d = arg->d;
+  auto xout = reinterpret_cast<float *>(arg->xout_addr);
+  auto size = arg->n;
 
-  for (int i = 0; i < d; ++i) {
-    float val(0.0f);
+  int row = blockIdx.y;
 
-    for (int j = 0; j < n; ++j)
-      val += w[i * n + j] * x[j];
+  float sum(0.0f);
+  for (int e = 0; e < size; ++e)
+    sum += w[row * size + e] * x[e];
 
-    xout[i] = val;
-  }
+  xout[row] = sum;
 }
 
 int main() {
   auto *arg = (matmul_arg_t *)csr_read(VX_CSR_MSCRATCH);
-  kernel(arg);
+  uint32_t grid_dim[2] = {1, arg->d};
 
-  return 0;
+  return vx_spawn_threads(2, grid_dim, nullptr, (vx_kernel_func_cb)kernel, arg);
 }
