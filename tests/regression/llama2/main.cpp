@@ -15,6 +15,7 @@
 
 #include "kernels.h"
 #include <vortex.h>
+#include "tracy/Tracy.hpp"
 
 // ----------------------------------------------------------------------------
 // Vortex
@@ -302,6 +303,7 @@ void matmul(float *xout, float *x, float *w, int n, int d) {
 }
 
 void matmul_vx(float *xout, float *x, vx_addr_h w, int n, int d) {
+  ZoneScoped;
   vx_buffer_h xout_buffer = nullptr;
   vx_buffer_h x_buffer = nullptr;
   matmul_arg_t args = {};
@@ -336,7 +338,7 @@ bool float_equal(float a, float b, float epsilon) {
 }
 
 float *forward(Transformer *transformer, int token, int pos) {
-
+  ZoneScoped;
   // a few convenience variables
   Config *p = &transformer->config;
   TransformerWeights *w = &transformer->weights;
@@ -877,6 +879,7 @@ long time_in_ms() {
 // generation loop
 
 void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, char *prompt, int steps) {
+  ZoneScoped;
   char empty_prompt[] = "";
   if (prompt == NULL) {
     prompt = empty_prompt;
@@ -1062,7 +1065,7 @@ void error_usage() {
 }
 
 int main(int argc, char *argv[]) {
-
+  ZoneScoped;
   // default parameters
   char *checkpoint_path = NULL; // e.g. out/model.bin
   const char *tokenizer_path = "tokenizer.bin";
