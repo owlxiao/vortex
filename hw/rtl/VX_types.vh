@@ -114,6 +114,25 @@
 `define VX_CSR_MPM_IFETCH_LT_H          12'hB91
 `define VX_CSR_MPM_LOAD_LT              12'hB12
 `define VX_CSR_MPM_LOAD_LT_H            12'hB92
+// PERF: stall-aware
+`define VX_CSR_MPM_SA_OTHER_STALL                  12'hB15
+`define VX_CSR_MPM_SA_OTHER_STALL_H                12'hB95
+`define VX_CSR_MPM_SA_NO_STALL                     12'hB16
+`define VX_CSR_MPM_SA_NO_STALL_H                   12'hB96
+`define VX_CSR_MPM_SA_IDLE_STALL                   12'hB17
+`define VX_CSR_MPM_SA_IDLE_STALL_H                 12'hB97
+`define VX_CSR_MPM_SA_CONTROL_STALL                12'hB18
+`define VX_CSR_MPM_SA_CONTROL_STALL_H              12'hB98
+`define VX_CSR_MPM_SA_SYNCHRONIZATION_STALL        12'hB19
+`define VX_CSR_MPM_SA_SYNCHRONIZATION_STALL_H      12'hB99
+`define VX_CSR_MPM_SA_MEMORY_DATA_STALL            12'hB1A
+`define VX_CSR_MPM_SA_MEMORY_DATA_STALL_H          12'hB9A
+`define VX_CSR_MPM_SA_MEMORY_STRUCTURAL_STALL      12'hB1B
+`define VX_CSR_MPM_SA_MEMORY_STRUCTURAL_STALL_H    12'hB9B
+`define VX_CSR_MPM_SA_COMPUTE_DATA_STALL           12'hB1C
+`define VX_CSR_MPM_SA_COMPUTE_DATA_STALL_H         12'hB9C
+`define VX_CSR_MPM_SA_COMPUTE_STRUCTURAL_STALL     12'hB1D
+`define VX_CSR_MPM_SA_COMPUTE_STRUCTURAL_STALL_H   12'hB9D
 
 // Machine Performance-monitoring memory counters (class 2) ///////////////////
 

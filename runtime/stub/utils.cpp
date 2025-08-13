@@ -214,6 +214,16 @@ extern int vx_dump_perf(vx_device_h hdevice, FILE* stream) {
   uint64_t mem_writes = 0;
   uint64_t mem_lat = 0;
   uint64_t mem_bank_stalls = 0;
+  // PERF: stall-aware
+  uint64_t other_stalls = 0;
+  uint64_t no_stalls = 0;
+  uint64_t idle_stalls = 0;
+  uint64_t control_stalls = 0;
+  uint64_t synchronization_stalls = 0;
+  uint64_t memory_data_stalls = 0;
+  uint64_t memory_structural_stalls = 0;
+  uint64_t compute_data_stalls = 0;
+  uint64_t compute_structural_stalls = 0;
 
   uint64_t num_cores;
   CHECK_ERR(vx_dev_caps(hdevice, VX_CAPS_NUM_CORES, &num_cores), {
@@ -426,6 +436,71 @@ extern int vx_dump_perf(vx_device_h hdevice, FILE* stream) {
         if (num_cores > 1) fprintf(stream, "PERF: core%d: stores=%ld\n", core_id, stores_per_core);
         stores += stores_per_core;
       }
+      // PERF: Stall Aware
+      {
+        uint64_t other_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_OTHER_STALL, core_id, &other_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] other stalls=%ld\n", core_id, other_stalls_per_core);
+        other_stalls += other_stalls_per_core;
+
+        uint64_t no_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_NO_STALL, core_id, &no_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] no-stalls=%ld\n", core_id, no_stalls_per_core);
+        no_stalls += no_stalls_per_core;
+
+        uint64_t idle_stall_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_IDLE_STALL, core_id, &idle_stall_per_core), {
+          return err; 
+        }) ;
+        fprintf(stream, "PERF: core%d: [stall-aware] idle stalls=%ld\n", core_id, idle_stall_per_core);
+        idle_stalls += idle_stall_per_core;
+
+        uint64_t control_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_CONTROL_STALL, core_id, &control_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] control stalls=%ld\n", core_id, control_stalls_per_core);
+        control_stalls += control_stalls_per_core;
+
+        uint64_t synchronization_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_SYNCHRONIZATION_STALL, core_id, &synchronization_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] synchronization stalls=%ld\n", core_id, synchronization_stalls_per_core);
+        synchronization_stalls += synchronization_stalls_per_core;
+
+        uint64_t memory_data_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_MEMORY_DATA_STALL, core_id, &memory_data_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] memory data stalls=%ld\n", core_id, memory_data_stalls_per_core);
+        memory_data_stalls += memory_data_stalls_per_core;
+
+        uint64_t memory_structural_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_MEMORY_STRUCTURAL_STALL, core_id, &memory_structural_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] memory structural stalls=%ld\n", core_id, memory_structural_stalls_per_core);
+        memory_structural_stalls += memory_structural_stalls_per_core;
+
+        uint64_t compute_data_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_COMPUTE_DATA_STALL, core_id, &compute_data_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] compute data stalls=%ld\n", core_id, compute_data_stalls_per_core);
+        compute_data_stalls += compute_data_stalls_per_core;
+
+        uint64_t compute_structural_stalls_per_core;
+        CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_SA_COMPUTE_STRUCTURAL_STALL, core_id, &compute_structural_stalls_per_core), {
+          return err;
+        });
+        fprintf(stream, "PERF: core%d: [stall-aware] compute structural stalls=%ld\n", core_id, compute_structural_stalls_per_core);
+        compute_structural_stalls += compute_structural_stalls_per_core;
+      }
     } break;
     case VX_DCR_MPM_CLASS_MEM: {
       if (lmem_enable) {
@@ -636,6 +711,25 @@ extern int vx_dump_perf(vx_device_h hdevice, FILE* stream) {
     fprintf(stream, "PERF: stores=%ld\n", stores);
     fprintf(stream, "PERF: ifetch latency=%d cycles\n", ifetch_avg_lat);
     fprintf(stream, "PERF: load latency=%d cycles\n", load_avg_lat);
+
+    int other_stalls_percent = calcAvgPercent(other_stalls, total_cycles);
+    int no_stalls_percent = calcAvgPercent(no_stalls, total_cycles);
+    int idle_stalls_percent = calcAvgPercent(idle_stalls, total_cycles);
+    int control_stalls_percent = calcAvgPercent(control_stalls, total_cycles);
+    int synchronization_stalls_percent = calcAvgPercent(synchronization_stalls, total_cycles);
+    int memory_data_stalls_percent = calcAvgPercent(memory_data_stalls, total_cycles);
+    int memory_structural_stalls_percent = calcAvgPercent(memory_structural_stalls, total_cycles);
+    int compute_data_stalls_percent = calcAvgPercent(compute_data_stalls, total_cycles);
+    int compute_structural_stalls_percent = calcAvgPercent(compute_structural_stalls, total_cycles);
+    fprintf(stream, "PERF: [stall-aware] other stalls=%ld (%d%%)\n", other_stalls, other_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] no-stalls=%ld (%d%%)\n", no_stalls, no_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] idle stalls=%ld (%d%%)\n", idle_stalls, idle_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] control stalls=%ld (%d%%)\n", control_stalls, control_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] synchronization stalls=%ld (%d%%)\n", synchronization_stalls, synchronization_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] memory data stalls=%ld (%d%%)\n", memory_data_stalls, memory_data_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] memory structural stalls=%ld (%d%%)\n", memory_structural_stalls, memory_structural_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] compute data stalls=%ld (%d%%)\n", compute_data_stalls, compute_data_stalls_percent);
+    fprintf(stream, "PERF: [stall-aware] compute structural stalls=%ld (%d%%)\n", compute_structural_stalls, compute_structural_stalls_percent);
   } break;
   case VX_DCR_MPM_CLASS_MEM: {
     if (l2cache_enable) {

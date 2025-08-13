@@ -206,8 +206,10 @@ void LsuUnit::tick() {
 		auto& state = states_.at(block_idx);
 		if (state.fence_lock) {
 			// wait for all pending memory operations to complete
-			if (!state.pending_rd_reqs.empty())
+			if (!state.pending_rd_reqs.empty()) {
+				core_->perf_stats_.set_at_least_one_memory_structural_stall_found(true);
 				continue;
+			}
 			Outputs.at(iw).push(state.fence_trace, 1);
 			state.fence_lock = false;
 			DT(3, this->name() << "-fence-unlock: " << state.fence_trace);
@@ -257,6 +259,7 @@ void LsuUnit::tick() {
 			if (!trace->log_once(true)) {
 				DT(4, "*** " << this->name() << "-queue-full: " << *trace);
 			}
+			core_->perf_stats_.set_at_least_one_memory_structural_stall_found(true);
 			continue;
 		} else {
 			trace->log_once(false);
@@ -333,6 +336,10 @@ void LsuUnit::tick() {
 			}
 			// remove input
 			input.pop();
+		} else {
+			if (input.size() > 1) {
+				core_->perf_stats_.set_at_least_one_memory_structural_stall_found(true);
+			}
 		}
 	}
 }

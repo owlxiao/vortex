@@ -502,6 +502,15 @@ Word Emulator::get_csr(uint32_t addr, uint32_t wid, uint32_t tid) {
         CSR_READ_64(VX_CSR_MPM_STORES, core_perf.stores);
         CSR_READ_64(VX_CSR_MPM_IFETCH_LT, core_perf.ifetch_latency);
         CSR_READ_64(VX_CSR_MPM_LOAD_LT, core_perf.load_latency);
+        CSR_READ_64(VX_CSR_MPM_SA_OTHER_STALL, core_perf.other_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_NO_STALL, core_perf.no_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_IDLE_STALL, core_perf.idle_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_CONTROL_STALL, core_perf.control_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_SYNCHRONIZATION_STALL, core_perf.synchronization_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_MEMORY_DATA_STALL, core_perf.memory_data_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_MEMORY_STRUCTURAL_STALL, core_perf.memory_structural_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_COMPUTE_DATA_STALL, core_perf.compute_data_stalls);
+        CSR_READ_64(VX_CSR_MPM_SA_COMPUTE_STRUCTURAL_STALL, core_perf.compute_structural_stalls);
         }
       } break;
       case VX_DCR_MPM_CLASS_MEM: {

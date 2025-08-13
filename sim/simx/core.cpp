@@ -212,6 +212,35 @@ void Core::tick() {
 
   ++perf_stats_.cycles;
   DPN(2, std::flush);
+
+  if (perf_stats_.at_least_one_no_stall_found) {
+    ++perf_stats_.no_stalls;
+  } else if (perf_stats_.at_least_one_memory_structural_stall_found) {
+    ++perf_stats_.memory_structural_stalls;
+  } else if (perf_stats_.at_least_one_memory_data_stall_found) {
+    ++perf_stats_.memory_data_stalls;
+  } else if (perf_stats_.at_least_one_synchronization_stall_found) {
+    ++perf_stats_.synchronization_stalls;
+  } else if (perf_stats_.at_least_one_compute_structural_stall_found) {
+    ++perf_stats_.compute_structural_stalls;
+  } else if (perf_stats_.at_least_one_compute_data_stall_found) {
+    ++perf_stats_.compute_data_stalls;
+  } else if (perf_stats_.at_least_one_control_stall_found) {
+    ++perf_stats_.control_stalls;
+  } else if (perf_stats_.at_least_one_idle_stall_found) {
+    ++perf_stats_.idle_stalls;
+  } else {
+    ++perf_stats_.other_stalls;
+  }
+
+  perf_stats_.set_at_least_one_no_stall_found(false);
+  perf_stats_.set_at_least_one_memory_structural_stall_found(false);
+  perf_stats_.set_at_least_one_memory_data_stall_found(false);
+  perf_stats_.set_at_least_one_synchronization_stall_found(false);
+  perf_stats_.set_at_least_one_compute_structural_stall_found(false);
+  perf_stats_.set_at_least_one_compute_data_stall_found(false);
+  perf_stats_.set_at_least_one_control_stall_found(false);
+  perf_stats_.set_at_least_one_idle_stall_found(false);
 }
 
 void Core::schedule() {
@@ -286,6 +315,10 @@ void Core::decode() {
     emulator_.resume(trace->wid);
   }
 
+  if (trace->fetch_stall) {
+    perf_stats_.set_at_least_one_control_stall_found(true);
+  }
+
   DT(3, "pipeline-decode: " << *trace);
 
   // insert to ibuffer
@@ -351,6 +384,11 @@ void Core::issue() {
         #endif
           default: assert(false);
           }
+          if (use.fu_type == FUType::LSU) {
+            perf_stats_.set_at_least_one_memory_data_stall_found(true);
+          } else {
+            perf_stats_.set_at_least_one_compute_data_stall_found(true);
+          }
         }
       } else {
         trace->log_once(false);
@@ -372,6 +410,9 @@ void Core::issue() {
       // to operand stage
       operands_.at(iw)->Input.push(trace, 1);
       ibuffer.pop();
+      perf_stats_.set_at_least_one_no_stall_found(true);
+    } else {
+      perf_stats_.set_at_least_one_idle_stall_found(true);
     }
 
     // track scoreboard stalls

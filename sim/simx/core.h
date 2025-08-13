@@ -70,6 +70,70 @@ public:
     uint64_t ifetch_latency;
     uint64_t load_latency;
 
+    // Stal aware perf stats
+    // HyFiSS version
+    uint64_t compute_structural_stalls;
+    bool at_least_one_compute_structural_stall_found;
+
+    uint64_t compute_data_stalls;
+    bool at_least_one_compute_data_stall_found;
+
+    uint64_t memory_structural_stalls;
+    bool at_least_one_memory_structural_stall_found;
+
+    uint64_t memory_data_stalls;
+    bool at_least_one_memory_data_stall_found;
+
+    uint64_t synchronization_stalls;
+    bool at_least_one_synchronization_stall_found;
+
+    uint64_t control_stalls;
+    bool at_least_one_control_stall_found;
+
+    uint64_t idle_stalls;
+    bool at_least_one_idle_stall_found;
+
+    uint64_t no_stalls;
+    bool at_least_one_no_stall_found;
+
+    uint64_t other_stalls;
+
+    void set_at_least_one_no_stall_found(bool value) {
+      at_least_one_no_stall_found = value;
+    }
+
+    void set_at_least_one_memory_structural_stall_found(bool value) {
+      at_least_one_memory_structural_stall_found = value;
+    }
+
+    void set_at_least_one_memory_data_stall_found(bool value) {
+      at_least_one_memory_data_stall_found = value;
+    }
+
+    void set_at_least_one_synchronization_stall_found(bool value) {
+      at_least_one_synchronization_stall_found = value;
+    }
+
+    void set_at_least_one_compute_structural_stall_found(bool value) {
+      at_least_one_compute_structural_stall_found = value;
+    }
+
+    void set_at_least_one_compute_data_stall_found(bool value) {
+      at_least_one_compute_data_stall_found = value;
+    }
+
+    void set_at_least_one_control_stall_found(bool value) {
+      at_least_one_control_stall_found = value;
+    }
+
+    void set_at_least_one_control_stall_found() {
+      at_least_one_control_stall_found = true;
+    }
+
+    void set_at_least_one_idle_stall_found(bool value) {
+      at_least_one_idle_stall_found = value;
+    }
+
     PerfStats()
       : cycles(0)
       , instrs(0)
@@ -96,6 +160,14 @@ public:
       , stores(0)
       , ifetch_latency(0)
       , load_latency(0)
+      , compute_structural_stalls(0)
+      , compute_data_stalls(0)
+      , memory_structural_stalls(0)
+      , memory_data_stalls(0)
+      , synchronization_stalls(0)
+      , control_stalls(0)
+      , idle_stalls(0)
+      , no_stalls(0)
     {}
   };
 
