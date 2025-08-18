@@ -20,6 +20,7 @@
 #include <mem.h>
 #include "types.h"
 #include "instr.h"
+#include "scheduler.h"
 #ifdef EXT_TCU_ENABLE
 #include "tensor_unit.h"
 #endif
@@ -154,6 +155,7 @@ private:
   uint32_t    ipdom_size_;
   Word        csr_mscratch_;
   wspawn_t    wspawn_;
+  std::unique_ptr<WarpScheduler> warp_scheduler_;
 
 #ifdef EXT_TCU_ENABLE
   TensorUnit::Ptr tensor_unit_;

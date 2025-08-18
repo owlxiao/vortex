@@ -85,7 +85,10 @@ Emulator::Emulator(const Arch &arch, const DCRS &dcrs, Core* core)
   #ifdef EXT_V_ENABLE
     , vec_unit_(core->vec_unit())
   #endif
+    , warp_scheduler_(nullptr)
 {
+  warp_scheduler_ = std::make_unique<FCFSScheduler>();
+  
   std::srand(50);
   this->reset();
 }
@@ -126,6 +129,9 @@ void Emulator::reset() {
   active_warps_.set(0);
   warps_[0].tmask.set(0);
   wspawn_.valid = false;
+
+  // Reset warp scheduler
+  warp_scheduler_->reset();
 }
 
 void Emulator::attach_ram(RAM* ram) {
@@ -166,14 +172,7 @@ instr_trace_t* Emulator::step() {
   }
 
   // find next ready warp
-  for (size_t wid = 0, nw = arch_.num_warps(); wid < nw; ++wid) {
-    bool warp_active = active_warps_.test(wid);
-    bool warp_stalled = stalled_warps_.test(wid);
-    if (warp_active && !warp_stalled) {
-      scheduled_warp = wid;
-      break;
-    }
-  }
+  scheduled_warp = warp_scheduler_->schedule(active_warps_, stalled_warps_, arch_.num_warps());
 
   if (scheduled_warp == -1)
     return nullptr;
