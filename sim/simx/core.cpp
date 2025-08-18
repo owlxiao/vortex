@@ -345,8 +345,11 @@ void Core::issue() {
     for (uint32_t w = 0; w < PER_ISSUE_WARPS; ++w) {
       uint32_t wid = w * ISSUE_WIDTH + iw;
       auto& ibuffer = ibuffers_.at(wid);
-      if (ibuffer.empty())
+      if (ibuffer.empty()) {
+        // This ibuffer has no active warps available for the current warp scheduler
+        perf_stats_.set_at_least_one_idle_stall_found(true);
         continue;
+      }
       // check scoreboard
       has_instrs = true;
       auto trace = ibuffer.top();
@@ -411,8 +414,6 @@ void Core::issue() {
       operands_.at(iw)->Input.push(trace, 1);
       ibuffer.pop();
       perf_stats_.set_at_least_one_no_stall_found(true);
-    } else {
-      perf_stats_.set_at_least_one_idle_stall_found(true);
     }
 
     // track scoreboard stalls
