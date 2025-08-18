@@ -316,11 +316,12 @@ void Core::decode() {
   }
 
   if (trace->fetch_stall) {
-    auto type = std::get<WctlType>(trace->op_type);
-    if (type == WctlType::BAR)
-      perf_stats_.set_at_least_one_synchronization_stall_found(true);
-    else
-      perf_stats_.set_at_least_one_control_stall_found(true);
+    if (auto type = std::get_if<WctlType>(&trace->op_type)) {
+      if (*type == WctlType::BAR)
+        perf_stats_.set_at_least_one_synchronization_stall_found(true);
+      else
+        perf_stats_.set_at_least_one_control_stall_found(true);
+    }
   }
 
   DT(3, "pipeline-decode: " << *trace);
